@@ -123,5 +123,22 @@ public class MultiPaxos_DDS {
         for (int i = 0; i < nbReplicas; i++) {
             send(new Message(Message.MessageType.CLIENT_STOP), i);
         }
+
+        // Wait for replicas to finish
+        for (int i = 0; i < nbReplicas; i++) {
+            try {
+                replicas[i].join(1000); // Wait max 1 second per replica
+            } catch (InterruptedException e) {
+                System.out.println("Interrupted while waiting for replica " + i + " to stop");
+            }
+        }
+
+        // Stop gateway
+        gateway.interrupt();
+        try {
+            gateway.join(500);
+        } catch (InterruptedException e) {
+            System.out.println("Interrupted while waiting for gateway to stop");
+        }
     }
 }

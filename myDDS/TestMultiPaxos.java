@@ -99,7 +99,13 @@ public class TestMultiPaxos {
         // Stop all replicas
         dds.stopReplicas();
 
+        // Wait for replicas to stop
+        Thread.sleep(500);
+
         System.out.println("\n=== Test Complete ===\n");
+
+        // Force exit to avoid hanging
+        System.exit(0);
     }
 
     /**
@@ -152,6 +158,13 @@ public class TestMultiPaxos {
         Thread.sleep(2000);
 
         dds.stopReplicas();
+
+        // Wait for replicas to stop
+        Thread.sleep(500);
+
         System.out.println("\n=== Test Complete ===\n");
+
+        // Force exit to avoid hanging
+        System.exit(0);
     }
 }
