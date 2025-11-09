@@ -82,12 +82,14 @@ boolean shouldBecomeLeader() {
 
 ### 3. 随机停止 Leader
 ```java
+// 在 handleAccept() 中达到多数后
+handleDecide(decide);  // 内部已更新 nextLogIndex = logIdx + 1
+
 if (random.nextInt(2) == 0) {
     // 停止当前 Leader
     isLeader = false;
 } else {
-    // 继续作为 Leader，提议下一个操作
-    nextLogIndex++;
+    // 继续作为 Leader（nextLogIndex 已被 handleDecide 更新）
     startNewRound();
 }
 ```
@@ -96,6 +98,26 @@ if (random.nextInt(2) == 0) {
 - `random.nextInt(2)` 返回 0 或 1
 - 返回 0: 停止作为 Leader
 - 返回 1: 继续作为 Leader
+- **重要**: `handleDecide()` 已更新 `nextLogIndex`，无需再次递增
+
+### 3.1 Timeout-based Leader Election（防止死锁）
+```java
+// 只有 Replica 0 负责超时触发
+if (id == 0) {
+    new Thread(() -> {
+        Thread.sleep(100);  // 等待 100ms
+        if (!isLeader && !clientRequests.isEmpty()) {
+            // 如果仍无 leader 且有待处理请求，强制启动新一轮
+            startNewRound();
+        }
+    }).start();
+}
+```
+
+**说明**:
+- 当 leader stepping down 后，如果正确的 leader 没有响应
+- Replica 0 在 100ms 后强制启动新一轮选举
+- 防止系统因为没有 leader 而卡住
 
 ### 4. 日志执行顺序
 ```java
@@ -109,6 +131,11 @@ void executeLog() {
     }
 }
 ```
+
+**重要修复**: 
+- ✅ **修复了日志索引跳跃bug**: 删除了 `handleAccept()` 中重复的 `nextLogIndex++`
+- ✅ **现在日志索引严格连续**: 0, 1, 2, 3, 4...（无跳跃）
+- ✅ **`handleDecide()` 正确更新索引**: `nextLogIndex = logIdx + 1`
 
 ## Multi-Paxos 协议流程
 
@@ -229,6 +256,14 @@ public class QueueOperation {
 3. **日志填充**: 必须连续填充，有空隙则等待
 4. **Leader 持续**: 随机决定是否继续（`random.nextInt(2)`）
 5. **客户端广播**: 每个请求发送到所有副本
+6. **⚠️ 关键Bug修复**:
+   - ❌ **原bug**: `nextLogIndex` 在 `handleDecide()` 和 `handleAccept()` 中被递增两次
+   - ✅ **修复**: 删除 `handleAccept()` 中的 `nextLogIndex++`
+   - ✅ **结果**: 日志索引现在严格连续（0, 1, 2, 3...）
+7. **⚠️ 死锁防止**:
+   - ❌ **原问题**: Leader stepping down 后可能没有新 leader
+   - ✅ **修复**: Replica 0 的 timeout-based leader election (100ms)
+   - ✅ **结果**: 系统永远不会卡住
 
 ## 调试建议
 

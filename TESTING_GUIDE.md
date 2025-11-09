@@ -72,6 +72,30 @@ make test
 - **操作**：每个配置下执行基本操作
 - **验证**：不同副本数量都能正确工作
 
+### 3. 自动验证测试 (`TestMultiPaxosVerification.java`)
+```bash
+make verify
+```
+
+**自动验证内容**：
+- ✅ **日志一致性**: 所有副本的日志完全相同
+- ✅ **索引连续性**: 日志索引严格递增（0, 1, 2, 3...），无跳跃、无间隙
+- ✅ **队列状态一致**: 所有副本的队列内容相同
+- ✅ **FIFO顺序**: Dequeue 结果符合先进先出语义
+
+**验证示例输出**：
+```
+📊 Checking logs from all replicas...
+Replica 0 log indices: [0, 1, 2, 3, 4]
+Replica 1 log indices: [0, 1, 2, 3, 4]
+Replica 2 log indices: [0, 1, 2, 3, 4]
+
+✅ VERIFICATION PASSED!
+   - All logs are identical
+   - Indices are consecutive (0 to 4)
+   - No gaps detected
+```
+
 ## 测试关键点
 
 根据文档要求："以任意顺序接收消息时，请注意正确性"
@@ -85,7 +109,7 @@ make test
 
 2. **共识验证**
    - 所有副本对操作顺序达成一致
-   - 日志索引严格递增
+   - 日志索引严格递增（已修复bug）
    - 只有获得多数派同意才决定
 
 3. **队列语义**
@@ -96,13 +120,25 @@ make test
 4. **Leader 选举**
    - Leader = round mod N
    - 随机停止机制（`random.nextInt(2)`）
+   - Timeout-based election 防止死锁
    - Leader 轮换正常工作
+
+5. **⚠️ 已修复的关键Bug**
+   - ✅ **日志索引跳跃**: 删除了重复的 `nextLogIndex++`
+   - ✅ **系统死锁**: 添加了 timeout-based leader election
+   - ✅ **索引连续性**: 现在日志索引严格为 0, 1, 2, 3...
+   - ✅ **操作遗漏**: 所有操作都会被执行，不会卡住
 
 ## 运行测试
 
-### 编译并运行所有测试
+### 编译并运行所有测试场景
 ```bash
 make test
+```
+
+### 运行自动验证测试
+```bash
+make verify
 ```
 
 ### 只运行基础测试
@@ -138,10 +174,14 @@ Replica 0 enqueued 100, queue size: 1, queue: [100]
 ### 关键输出解读
 
 - **Leader 选举**：`Replica X starting round Y as leader`
+- **Timeout触发**：`Replica 0 triggering timeout-based leader election`
 - **多数派**：`became leader with N promises (majority reached)`
 - **决策**：`reached majority accepts, broadcasting DECIDE`
 - **执行**：`executing at logIndex X: OPERATION`
 - **队列状态**：`queue size: N, queue: [...]`
+- **Leader继续/停止**：
+  - `continuing as leader for next index X`
+  - `stepping down as leader (random stop)`
 
 ## 自定义测试
 
