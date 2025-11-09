@@ -55,6 +55,16 @@ PAXOS_VERIFY_SRCS = $(COMMON_SRCS) \
 	myDDS/MultiPaxos_DDS.java \
 	myDDS/TestMultiPaxosVerification.java
 
+# Multi-Paxos optional feature (multiple invocations per client)
+PAXOS_OPTIONAL_SRCS = $(COMMON_SRCS) \
+	myDDS/Replica.java \
+	myDDS/DDS.java \
+	myDDS/QueueOperation.java \
+	myDDS/MultiPaxos_Message.java \
+	myDDS/MultiPaxos_Replica.java \
+	myDDS/MultiPaxos_DDS.java \
+	myDDS/TestMultiPaxosOptional.java
+
 # Default target
 default:
 	@echo "  Distributed system - TD5"
@@ -65,6 +75,7 @@ default:
 	@echo "  make paxos    - Clean, build and run Multi-Paxos (basic test)"
 	@echo "  make test     - Clean, build and run Multi-Paxos (all scenarios)"
 	@echo "  make verify   - Clean, build and run Multi-Paxos (with verification)"
+	@echo "  make optional - Clean, build and run Multi-Paxos (optional feature)"
 	@echo "  make all      - Build all implementations"
 	@echo "  make clean    - Remove all .class files"
 	@echo ""
@@ -108,6 +119,14 @@ verify: clean
 	@echo "✓ Multi-Paxos Verification Tests compiled"
 	@echo ""
 	@java -cp . myDDS.TestMultiPaxosVerification
+
+# Build and run Multi-Paxos optional feature (multiple invocations)
+optional: clean
+	@echo "Building Multi-Paxos Optional Feature (Multiple Invocations)..."
+	@javac $(JFLAGS) $(PAXOS_OPTIONAL_SRCS)
+	@echo "✓ Multi-Paxos Optional Feature compiled"
+	@echo ""
+	@java -cp . myDDS.TestMultiPaxosOptional
 
 # Build both implementations
 all: clean

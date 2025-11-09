@@ -1,10 +1,12 @@
-# Multi-Paxos Implementation Overview
+# TD 6 Multi-Paxos Implementation Overview
+
+## Concurrency Safety
+
+The implementation ensures thread-safe message handling through Java's concurrent data structures. **ChannelFIFO** uses `LinkedBlockingQueue` with internal locking mechanisms that guarantee atomic `take()` operations - when multiple threads receive simultaneously, each gets a unique message through mutex locks. **ChannelBag** uses `ConcurrentSkipListSet` with lock-free CAS (Compare-And-Swap) operations - the `remove()` method returns success/failure, allowing only one thread to retrieve each message while others retry on failure. This prevents duplicate message delivery and ensures correctness even under high concurrency.
 
 ## Project Structure
 
-This project implements a distributed queue using the Multi-Paxos consensus algorithm. The implementation is based on modifying files from the previous ABD lab.
-
-## Key Components
+This project implements a distributed queue using the Multi-Paxos consensus algorithm.
 
 ### 1. Message Class (`MultiPaxos_Message.java`)
 

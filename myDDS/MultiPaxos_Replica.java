@@ -19,8 +19,9 @@ public class MultiPaxos_Replica extends Thread {
     private final Map<Integer, Integer> acceptedRound; // log index -> highest accepted round
     private final Map<Integer, QueueOperation> acceptedValue; // log index -> accepted operation
 
-    // Client requests tracking (basic version: one invocation per client)
-    private final Map<Integer, QueueOperation> clientRequests; // client id -> pending operation
+    // Client requests tracking (OPTIONAL: support multiple invocations per client)
+    private final Map<Integer, TreeMap<Integer, QueueOperation>> clientRequests; // client id -> (invNum -> operation)
+    private final Map<Integer, Integer> clientNextInvocation; // client id -> next expected invocation number
 
     // Leader state
     private int currentRound;
@@ -53,6 +54,7 @@ public class MultiPaxos_Replica extends Thread {
         this.acceptedValue = new ConcurrentHashMap<>();
 
         this.clientRequests = new ConcurrentHashMap<>();
+        this.clientNextInvocation = new ConcurrentHashMap<>();
 
         this.currentRound = 0;
         this.nextLogIndex = 0;
@@ -127,9 +129,14 @@ public class MultiPaxos_Replica extends Thread {
      */
     private void handleClientRequest(MultiPaxos_Message msg) {
         QueueOperation op = msg.operation;
+        int clientId = op.getClientId();
+        int invNum = op.getInvocationNum();
 
-        // Store client request
-        clientRequests.put(op.getClientId(), op);
+        // Store client request (support multiple invocations per client)
+        if (!clientRequests.containsKey(clientId)) {
+            clientRequests.put(clientId, new TreeMap<>());
+        }
+        clientRequests.get(clientId).put(invNum, op);
 
         System.out.println("Replica " + id + " stored client request: " + op);
 
@@ -328,17 +335,34 @@ public class MultiPaxos_Replica extends Thread {
 
     /**
      * Choose a pending operation to propose
+     * OPTIONAL: Respects invocation order - only proposes invocation N if N-1 was
+     * decided
      */
     private QueueOperation choosePendingOperation() {
-        // Basic version: just pick any pending operation
-        if (!clientRequests.isEmpty()) {
-            QueueOperation op = clientRequests.values().iterator().next();
-            System.out.println("Replica " + id + " chose pending operation: " + op);
-            return op;
-        }
+        // Iterate through all clients
+        for (Map.Entry<Integer, TreeMap<Integer, QueueOperation>> entry : clientRequests.entrySet()) {
+            int clientId = entry.getKey();
+            TreeMap<Integer, QueueOperation> invocations = entry.getValue();
 
-        // Optional: For multiple invocations per client, need to respect order
-        // ... implementation for optional part ...
+            if (invocations.isEmpty()) {
+                continue;
+            }
+
+            // Get the next expected invocation number for this client
+            int nextExpected = clientNextInvocation.getOrDefault(clientId, 0);
+
+            // Check if this invocation is available
+            if (invocations.containsKey(nextExpected)) {
+                QueueOperation op = invocations.get(nextExpected);
+                System.out.println("Replica " + id + " chose pending operation: " + op +
+                        " (next expected inv for client " + clientId + " = " + nextExpected + ")");
+                return op;
+            } else {
+                System.out.println("Replica " + id + " waiting for invocation " + nextExpected +
+                        " from client " + clientId +
+                        " (have: " + invocations.keySet() + ")");
+            }
+        }
 
         return null;
     }
@@ -447,8 +471,19 @@ public class MultiPaxos_Replica extends Thread {
         // Store in log
         log.put(logIdx, op);
 
-        // Remove from pending requests
-        clientRequests.remove(op.getClientId());
+        // Remove from pending requests (OPTIONAL: handle multiple invocations)
+        int clientId = op.getClientId();
+        int invNum = op.getInvocationNum();
+        if (clientRequests.containsKey(clientId)) {
+            clientRequests.get(clientId).remove(invNum);
+            if (clientRequests.get(clientId).isEmpty()) {
+                clientRequests.remove(clientId);
+            }
+        }
+
+        // OPTIONAL: Update next expected invocation for this client
+        clientNextInvocation.put(clientId, invNum + 1);
+        System.out.println("Replica " + id + " updated clientNextInvocation[" + clientId + "] = " + (invNum + 1));
 
         // Update next log index if needed
         if (logIdx >= nextLogIndex) {
