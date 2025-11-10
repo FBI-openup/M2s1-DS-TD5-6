@@ -1,5 +1,5 @@
 # TD 6 Multi-Paxos Implementation Overview
-
+https://github.com/FBI-openup/M2s1-DS-TD5-6.git
 ## Concurrency Safety
 
 The implementation ensures thread-safe message handling through Java's concurrent data structures. **ChannelFIFO** uses `LinkedBlockingQueue` with internal locking mechanisms that guarantee atomic `take()` operations - when multiple threads receive simultaneously, each gets a unique message through mutex locks. **ChannelBag** uses `ConcurrentSkipListSet` with lock-free CAS (Compare-And-Swap) operations - the `remove()` method returns success/failure, allowing only one thread to retrieve each message while others retry on failure. This prevents duplicate message delivery and ensures correctness even under high concurrency.
